@@ -15,28 +15,19 @@ library(tidyverse)
 
 ## Problem 1
 
+Import `pols_month`
+
 ```{r}
-pols_month =
+pols_month_df =
   read_csv("data/fivethirtyeight/pols-month.csv") |> 
   janitor::clean_names() |> 
   separate(mon, into = c("year", "month", "day")) |> 
   mutate(
-    month = 
-      case_match(
-        month,
-        "01" ~ "January",
-        "02" ~ "February",
-        "03" ~ "March",
-        "04" ~ "April",
-        "05" ~ "May",
-        "06" ~ "June",
-        "07" ~ "July",
-        "08" ~ "August",
-        "09" ~ "September",
-        "10" ~ "October",
-        "11" ~ "November",
-        "12" ~ "December"
-      )
+    month = month (
+      as.integer(month),
+      label = TRUE,
+      abbr = FALSE
+    )
   ) |> 
   pivot_longer(
     cols = c(prez_gop, prez_dem),
@@ -44,6 +35,46 @@ pols_month =
     values_to = "party"
   ) |> 
   select(-day)
+```
 
+Import `snp`
+
+```{r}
+snp_df =
+  read_csv("data/fivethirtyeight/snp.csv") |> 
+  janitor::clean_names() |> 
+  mutate(date = as.Date(date, format = "%m/%d/%y")) |> 
+  separate(date, into = c("year", "month", "day")) |> 
+  mutate(
+    month = month (
+      as.integer(month),
+      label = TRUE,
+      abbr = FALSE
+    )
+  ) |> 
+  select(-day) |> 
+  relocate(year,everything()) |> 
+  arrange(year,month)
+```
+
+Import `unemployment`
+
+```{r}
+unemployment_df =
+  read_csv("data/fivethirtyeight/unemployment.csv") |> 
+  janitor::clean_names() |> 
+  pivot_longer(
+    cols = jan:dec,
+    names_to = "month",
+    values_to = "unemployment_percentage"
+  ) |> 
+ mutate(
+   month =
+     month(
+       parse_date_time(month, orders = "b"),
+       label = TRUE,
+       abbr = FALSE
+     )
+ )
 ```
 

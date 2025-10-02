@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, tidy = TRUE)
 
 ```{r}
 library(tidyverse)
+library(readxl)
 ```
 
 ## Problem 1
@@ -29,12 +30,12 @@ pols_month_df =
       abbr = FALSE
     )
   ) |> 
-  pivot_longer(
-    cols = c(prez_gop, prez_dem),
-    names_to = "president",
-    values_to = "party"
-  ) |> 
-  select(-day)
+  mutate(
+    president = case_when(
+      prez_gop == 1 ~ "gop",
+      prez_dem == 1 ~ "dem")
+  ) |>
+  select(-c(prez_gop,prez_dem,day))
 ```
 
 Import `snp`
@@ -74,7 +75,217 @@ unemployment_df =
        parse_date_time(month, orders = "b"),
        label = TRUE,
        abbr = FALSE
-     )
+     ),
+   year = as.character(year)
  )
 ```
+
+Join the datasets
+
+```{r}
+combined_df = pols_month_df |> 
+  left_join(snp_df, by = c("year", "month")) |> 
+  left_join(unemployment_df, by = c("year", "month")) 
+
+head(combined_df)
+```
+
+For the first dataset `pols-month`, after tidying, there are `r ncol(pols_month_df)` variables and `r nrow(pols_month_df)` rows of data remaining. The year range is from `r min(pols_month_df$year)` to `r max(pols_month_df$year)`. The variables are: `r colnames(pols_month_df)`.
+
+For the second dataset `snp`, after tidying, there are `r ncol(snp_df)` variables and `r nrow(snp_df)` rows of data remaining. The year range is from `r min(snp_df$year)` to `r max(snp_df$year)`. The variables are: `r colnames(snp_df)`.
+
+For the third dataset `unemmployment`, after tidying, there are `r ncol(unemployment_df)` variables and `r nrow(unemployment_df)` rows of data remaining. The year range is from `r min(unemployment_df$year)` to `r max(unemployment_df$year)`. The variables are: `r colnames(unemployment_df)`.
+
+Now, I start to combine these three datasets. I use `left_join()` to combine `snp` and `unemployment` these two datasets into `pols-month` by there shared variable `year` and `month`. After merging, there are `r ncol(combined_df)` variables and `r nrow(combined_df)` rows of data remaining. The year range is from `r min(combined_df$year)` to `r max(combined_df$year)`. The variables are: `r colnames(combined_df)`. Key variables include `year` and `month`, since they serve as indicators of time. `President` reflects the impact of political party affiliation. Close serves as an indicator of financial market performance, and unemployment percentage reflects the overall economy as well as social stability.
+
+## Problem 2
+
+Import `Mr.Trash Wheel` 
+
+```{r}
+mr_trash_wheel =
+  read_excel("data/202509 Trash Wheel Collection Data.xlsx", 
+             sheet = 1, range = "A2:N710",  na = c("NA",".","")) |> 
+  janitor::clean_names() |> 
+  filter(!is.na(dumpster)) |> 
+  mutate(
+    sports_balls = as.integer(sports_balls),
+    group = "mr_trash_wheel",
+    year = as.numeric(year)
+         )
+```
+
+Import `Professor Trash Wheel`
+
+```{r}
+prof_trash_wheel =
+  read_excel("data/202509 Trash Wheel Collection Data.xlsx", 
+             sheet = 2, range = "A2:M135",  na = c("NA",".","")) |> 
+  janitor::clean_names() |> 
+  filter(!is.na(dumpster)) |> 
+  mutate(
+    group = "prof_trash_wheel"
+         )
+```
+
+Import `Gwynnda Trash Wheel`
+
+```{r}
+gwynnda_trash_wheel =
+  read_excel("data/202509 Trash Wheel Collection Data.xlsx", 
+             sheet = 4, range = "A2:L352",  na = c("NA",".","")) |> 
+  janitor::clean_names() |> 
+  filter(!is.na(dumpster)) |> 
+  mutate(
+    group = "gwynnda_trash_wheel"
+         )
+```
+
+Join the datasets
+
+```{r}
+combined_trash = 
+  bind_rows(mr_trash_wheel, prof_trash_wheel, gwynnda_trash_wheel) |> 
+  janitor::clean_names() |> 
+  relocate(group) 
+
+head(combined_trash)
+```
+
+```{r}
+prof_trash_wheel |>
+  select(weight_tons) |>
+  sum(na.rm = TRUE)
+```
+
+```{r}
+gwynnda_trash_wheel |> 
+  filter(month == "June", year == "2022") |> 
+  select(cigarette_butts) |> 
+  sum()
+```
+
+For the first dataset `Mr.Trash Wheel`, after tidying, there are `r ncol(mr_trash_wheel)` variables and `r nrow(mr_trash_wheel)` rows of data remaining. The year range is from `r min(mr_trash_wheel$year)` to `r max(mr_trash_wheel$year)`.
+
+For the second dataset `Professor Trash Wheel`, after tidying, there are `r ncol(prof_trash_wheel)` variables and `r nrow(prof_trash_wheel)` rows of data remaining. The year range is from `r min(prof_trash_wheel$year)` to `r max(prof_trash_wheel$year)`.
+
+For the third dataset `Gwynns Falls Trash Wheel`, after tidying, there are `r ncol(gwynnda_trash_wheel)` variables and `r nrow(gwynnda_trash_wheel)` rows of data remaining. The year range is from `r min(gwynnda_trash_wheel$year)` to `r max(gwynnda_trash_wheel$year)`. 
+
+Then, we combine three datasets together, after tidying, there are `r ncol(combined_trash)` variables and `r nrow(combined_trash)` rows of data remaining. The year range is from `r min(combined_trash$year)` to `r max(combined_trash$year)`. vairables that in the final combined dataset are: `r colnames(combined_df)`. Key variables include ·`date` which records the time of each observation, and `weight_tons`, which measures the total weight of trash collected. `Plastic_bottles` is chosen as a representative type of waste, showing how much plastic pollution was captured. `Homes_powered` indicates the amount of electricity generated from the collected waste.
+
+Total weight of trash collected by Professor Trash Wheel equals **282.26**. 
+
+And the total number of cigarette butts collected by Gwynnda in June of 2022 equals **18120**.
+
+## Problem 3
+
+```{r}
+zip_code_df =
+  read_csv("data/zillow_data/Zip Codes.csv") |> 
+  janitor::clean_names() |> 
+  rename(borough = county) |> 
+  mutate(borough = case_when(
+    borough == "New York" ~ "Manhattan",
+    borough == "Kings" ~ "Brooklyn",
+    borough == "Richmond" ~ "Stateb_Island",
+    TRUE ~ borough
+    ),
+    date = as.Date(file_date, format = "%m/%d/%y")
+  ) |> 
+  select(zip_code, borough,neighborhood) 
+```
+
+```{r}
+zori_df = 
+  read_csv("data/zillow_data/Zip_zori_uc_sfrcondomfr_sm_month_NYC.csv") |> 
+  janitor::clean_names() |> 
+  rename(
+    borough = county_name,
+    zip_code = region_name) |> 
+  mutate(borough = case_when(
+    borough == "New York County" ~ "Manhattan",
+    borough == "Kings County" ~ "Brooklyn",
+    borough == "Richmond County" ~ "Stateb_Island",
+    borough == "Queens County" ~ "Queens",
+    borough == "Bronx County" ~"Bronx"
+    ) 
+  )|> 
+  pivot_longer(
+    cols = starts_with("x20"),     
+    names_to = "date",             
+    values_to = "value",
+    names_prefix = "x"
+  ) |> 
+  mutate(
+    date = as.Date(date, format = "%Y_%m_%d"),
+  ) |> 
+  select(zip_code, borough, date,value) 
+```
+
+```{r}
+combined_zillow = 
+  left_join(zori_df, zip_code_df, by = c("zip_code", "borough"))|> 
+  relocate(neighborhood, .after = borough) |> 
+  arrange(zip_code)
+
+head(combined_zillow)
+```
+
+
+After tidying, the final combined dataset include `r ncol(combined_zillow)` variables and and `r nrow(combined_zillow)` rows of data remaining. vairables that in the final combined dataset are: `r colnames(combined_zillow)`. `zip_code`, which serves as an indicator for location. `Borough` shows the broader district to which the area belongs, while `neighborhood` provides a more specific subdivision within the borough. `Date` records the time of observation, and `value` represents the rental price at that given time.
+
+There are total `r nrow(combined_zillow)` observations, **149** unique `zip code` and **42** unique `neighborhood`.
+
+```{r}
+combined_zillow |> 
+  drop_na(zip_code, neighborhood) |> 
+  summarise(
+    total = n(),
+    unique_zip = n_distinct(zip_code),
+    unique_neighbor = n_distinct(neighborhood)
+  )
+
+```
+
+We can see that there are **171** zip codes that only `ZIP code` dataset. For example, zip code like 10008, 10020, 10041, 10043, 10045, and 10047 only occur in `ZIP code` dataset. Some of zip codes are missing from `Zillow` because they don't have rentable housing. Besides, zip codes from `ZIP code` dataset isfrom 2007, whereas zip codes from `Zillow`  are from 2015 onward. Hence, some zip codes may no longer exist.
+
+```{r}
+leftonly_zips =
+  zip_code_df |> 
+  distinct(zip_code) |> 
+  anti_join(
+    zori_df |> distinct(zip_code),
+    by = "zip_code"
+  ) |> 
+  arrange(zip_code)
+
+head(leftonly_zips)
+
+n_distinct(leftonly_zips$zip_code)
+```
+
+Below are the table for 10 largest drop in price from January 2020 to 2021. All top ten largest drops are in Manhattan, mostly clustered in Lower Manhattan and Midtown. The big drops make sense: remote work kept people out of the offices, and the pandemic erased tourist traffic around business districts and major attractions.
+
+```{r}
+table_top10 = 
+  combined_zillow |>
+  filter(month(date) == 1, year(date) %in% c(2020, 2021)) |>
+  mutate(year = year(date)) |>
+  select(-date) |>
+  pivot_wider(
+    names_from = year, 
+    values_from = value
+    ) |>
+  rename(Jan_2020 = `2020`, Jan_2021 = `2021`) |>
+  mutate(
+    decrease = Jan_2020 - Jan_2021
+    ) |>
+  arrange(desc(decrease))
+
+table_top10 |> 
+  slice_head(n = 10) |> 
+  knitr::kable()
+```
+
+
 
